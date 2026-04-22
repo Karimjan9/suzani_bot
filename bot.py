@@ -36,7 +36,7 @@ LANGUAGE_PICKER_TEXT = (
 
 def build_language_menu() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
-        keyboard=[
+        inline_keyboard=[
             [
                 InlineKeyboardButton(
                     text=LANGUAGE_NAMES["uz"],
@@ -57,7 +57,7 @@ def build_language_menu() -> InlineKeyboardMarkup:
 
 def build_main_menu(language: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
-        keyboard=[
+        inline_keyboard=[
             [InlineKeyboardButton(text=get_menu_text(language, "about"), callback_data="about")],
             [InlineKeyboardButton(text=get_menu_text(language, "telegram"), url=TELEGRAM_URL)],
             [InlineKeyboardButton(text=get_menu_text(language, "instagram"), url=INSTAGRAM_URL)],
