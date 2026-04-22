@@ -37,6 +37,8 @@ def get_optional_str(name: str, default: str = "") -> str:
 BOT_TOKEN = get_required_env("BOT_TOKEN")
 ADMIN_CHAT_ID = get_optional_int("ADMIN_CHAT_ID")
 WELCOME_IMAGE_URL = get_optional_str("WELCOME_IMAGE_URL")
+WELCOME_BANNER_MODE = get_optional_str("WELCOME_BANNER_MODE", "sequence").lower()
+WELCOME_BANNER_DIR = BASE_DIR / get_optional_str("WELCOME_BANNER_DIR", "images")
 
 DB_CONFIG = {
     "host": get_optional_str("DB_HOST", "127.0.0.1"),
@@ -54,9 +56,9 @@ STORE_DESCRIPTION = (
     "sahifalarga yo'naltiruvchi rasmiy bot."
 )
 
-TELEGRAM_URL = "https://t.me/suzani_shop_admin"
+TELEGRAM_URL = get_optional_str("TELEGRAM_URL", "https://t.me/suzani_shop_admin")
 INSTAGRAM_URL = "https://instagram.com/suzani_shop"
-WEBSITE_URL = "https://suzanishop.uz"
+WEBSITE_URL = get_optional_str("WEBSITE_URL", "https://www.art-mokhitobon.uz/")
 MAP_URL = "https://maps.google.com/?q=Buxoro+shahri+hunarmandlar+shaharchasi"
 
 ADDRESS = "Buxoro shahri, hunarmandlar shaharchasi"

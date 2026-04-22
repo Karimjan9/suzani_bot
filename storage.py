@@ -1,6 +1,6 @@
 import re
 from contextlib import contextmanager
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any, Iterator
 
 import mysql.connector
@@ -23,6 +23,10 @@ def _validate_database_name(db_name: str) -> str:
     if not DB_NAME_PATTERN.fullmatch(db_name):
         raise RuntimeError("DB_NAME faqat harf, raqam va `_` belgisidan iborat bo'lishi kerak.")
     return db_name
+
+
+def _utc_timestamp() -> str:
+    return datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
 
 
 @contextmanager
@@ -61,33 +65,80 @@ def init_db(db_config: dict[str, Any]) -> None:
         cursor = connection.cursor()
         try:
             cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS user_preferences (
-                user_id BIGINT PRIMARY KEY,
-                language VARCHAR(10) NOT NULL,
-                updated_at DATETIME NOT NULL
-            )
-            ENGINE=InnoDB
-            DEFAULT CHARSET=utf8mb4
-            COLLATE=utf8mb4_unicode_ci
-            """
+                """
+                CREATE TABLE IF NOT EXISTS user_preferences (
+                    user_id BIGINT PRIMARY KEY,
+                    language VARCHAR(10) NOT NULL,
+                    updated_at DATETIME NOT NULL
+                )
+                ENGINE=InnoDB
+                DEFAULT CHARSET=utf8mb4
+                COLLATE=utf8mb4_unicode_ci
+                """
             )
             cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS events (
-                id BIGINT PRIMARY KEY AUTO_INCREMENT,
-                user_id BIGINT NOT NULL,
-                event_name VARCHAR(100) NOT NULL,
-                language VARCHAR(10) NOT NULL,
-                created_at DATETIME NOT NULL,
-                INDEX idx_events_user_id (user_id),
-                INDEX idx_events_event_name (event_name)
+                """
+                CREATE TABLE IF NOT EXISTS events (
+                    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                    user_id BIGINT NOT NULL,
+                    event_name VARCHAR(100) NOT NULL,
+                    language VARCHAR(10) NOT NULL,
+                    created_at DATETIME NOT NULL,
+                    INDEX idx_events_user_id (user_id),
+                    INDEX idx_events_event_name (event_name)
+                )
+                ENGINE=InnoDB
+                DEFAULT CHARSET=utf8mb4
+                COLLATE=utf8mb4_unicode_ci
+                """
             )
-            ENGINE=InnoDB
-            DEFAULT CHARSET=utf8mb4
-            COLLATE=utf8mb4_unicode_ci
-            """
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS leads (
+                    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                    user_id BIGINT NOT NULL,
+                    lead_type VARCHAR(30) NOT NULL,
+                    full_name VARCHAR(255) NOT NULL,
+                    phone VARCHAR(50) NOT NULL,
+                    interest TEXT NOT NULL,
+                    username VARCHAR(255) NOT NULL,
+                    language VARCHAR(10) NOT NULL,
+                    created_at DATETIME NOT NULL,
+                    INDEX idx_leads_user_id (user_id),
+                    INDEX idx_leads_type (lead_type)
+                )
+                ENGINE=InnoDB
+                DEFAULT CHARSET=utf8mb4
+                COLLATE=utf8mb4_unicode_ci
+                """
             )
+        finally:
+            cursor.close()
+
+
+def has_user_activity(db_config: dict[str, Any], user_id: int) -> bool:
+    with _connect(db_config) as connection:
+        cursor = connection.cursor()
+        try:
+            cursor.execute(
+                "SELECT 1 FROM user_preferences WHERE user_id = %s LIMIT 1",
+                (user_id,),
+            )
+            if cursor.fetchone() is not None:
+                return True
+
+            cursor.execute(
+                "SELECT 1 FROM events WHERE user_id = %s LIMIT 1",
+                (user_id,),
+            )
+            if cursor.fetchone() is not None:
+                return True
+
+            cursor.execute(
+                "SELECT 1 FROM leads WHERE user_id = %s LIMIT 1",
+                (user_id,),
+            )
+            return cursor.fetchone() is not None
         finally:
             cursor.close()
 
@@ -110,35 +161,78 @@ def get_user_language(db_config: dict[str, Any], user_id: int) -> str | None:
 
 
 def save_user_language(db_config: dict[str, Any], user_id: int, language: str) -> None:
-    timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = _utc_timestamp()
     with _connect(db_config) as connection:
         cursor = connection.cursor()
         try:
             cursor.execute(
-            """
-            INSERT INTO user_preferences (user_id, language, updated_at)
-            VALUES (%s, %s, %s)
-            ON DUPLICATE KEY UPDATE
-                language = VALUES(language),
-                updated_at = VALUES(updated_at)
-            """,
-            (user_id, language, timestamp),
+                """
+                INSERT INTO user_preferences (user_id, language, updated_at)
+                VALUES (%s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    language = VALUES(language),
+                    updated_at = VALUES(updated_at)
+                """,
+                (user_id, language, timestamp),
             )
         finally:
             cursor.close()
 
 
 def log_event(db_config: dict[str, Any], user_id: int, event_name: str, language: str) -> None:
-    timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = _utc_timestamp()
     with _connect(db_config) as connection:
         cursor = connection.cursor()
         try:
             cursor.execute(
-            """
-            INSERT INTO events (user_id, event_name, language, created_at)
-            VALUES (%s, %s, %s, %s)
-            """,
-            (user_id, event_name, language, timestamp),
+                """
+                INSERT INTO events (user_id, event_name, language, created_at)
+                VALUES (%s, %s, %s, %s)
+                """,
+                (user_id, event_name, language, timestamp),
+            )
+        finally:
+            cursor.close()
+
+
+def save_lead(
+    db_config: dict[str, Any],
+    user_id: int,
+    lead_type: str,
+    full_name: str,
+    phone: str,
+    interest: str,
+    username: str,
+    language: str,
+) -> None:
+    timestamp = _utc_timestamp()
+    with _connect(db_config) as connection:
+        cursor = connection.cursor()
+        try:
+            cursor.execute(
+                """
+                INSERT INTO leads (
+                    user_id,
+                    lead_type,
+                    full_name,
+                    phone,
+                    interest,
+                    username,
+                    language,
+                    created_at
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    user_id,
+                    lead_type,
+                    full_name,
+                    phone,
+                    interest,
+                    username,
+                    language,
+                    timestamp,
+                ),
             )
         finally:
             cursor.close()
@@ -150,22 +244,24 @@ def get_stats(db_config: dict[str, Any]) -> dict[str, object]:
         try:
             cursor.execute("SELECT COUNT(*) AS count FROM user_preferences")
             users_count = cursor.fetchone()["count"]
+            cursor.execute("SELECT COUNT(*) AS count FROM leads")
+            leads_count = cursor.fetchone()["count"]
             cursor.execute(
-            """
-            SELECT language, COUNT(*) AS count
-            FROM user_preferences
-            GROUP BY language
-            ORDER BY count DESC, language ASC
-            """
+                """
+                SELECT language, COUNT(*) AS count
+                FROM user_preferences
+                GROUP BY language
+                ORDER BY count DESC, language ASC
+                """
             )
             language_rows = cursor.fetchall()
             cursor.execute(
-            """
-            SELECT event_name, COUNT(*) AS count
-            FROM events
-            GROUP BY event_name
-            ORDER BY count DESC, event_name ASC
-            """
+                """
+                SELECT event_name, COUNT(*) AS count
+                FROM events
+                GROUP BY event_name
+                ORDER BY count DESC, event_name ASC
+                """
             )
             event_rows = cursor.fetchall()
         finally:
@@ -173,6 +269,7 @@ def get_stats(db_config: dict[str, Any]) -> dict[str, object]:
 
     return {
         "users_count": int(users_count),
+        "leads_count": int(leads_count),
         "languages": [(str(row["language"]), int(row["count"])) for row in language_rows],
         "events": [(str(row["event_name"]), int(row["count"])) for row in event_rows],
     }
