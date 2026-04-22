@@ -132,3 +132,4 @@ cython_debug/
 # Cursor
 .cursorignore
 .cursorindexingignore
+bot_data.sqlite3

@@ -1,0 +1,16 @@
+[Unit]
+Description=Suzani Shop Telegram Bot
+After=network.target
+
+[Service]
+Type=simple
+User=botuser
+Group=botuser
+WorkingDirectory=/opt/suzani_bot
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/suzani_bot/.venv/bin/python /opt/suzani_bot/bot.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
